@@ -1,81 +1,72 @@
 @vis = null
 @idx = 0
+@guideArrow = null
 
 Meteor.startup ->
   @vis = d3.select("svg")
-    .attr("width", 960)
-    .attr("height", 500)
+  .attr("width", 960)
+  .attr("height", 500)
 
-@dragmove= (d,i)->
+@dragmove = (d)->
   console.log d.x, d.y
 
 _.extend Template.main,
   events:
     'click #addBox': ->
-      Entities.insert 
-        v:++idx
-        name: "#box#{idx}"
+      Entities.insert
         height: 100
         width: 100
         x: 10
         y: 10
-  rendered:->
+  rendered: ->
+    guideArrow = vis.append("g")
+    .append("line")
+    .attr("x1", 0)
+    .attr("y1", 0)
+    .attr("x2", 0)
+    .attr("y2", 0)
+    .attr("stroke", "#000000")
+    .attr("stroke-width", 1)
+    dragBox = (obj)->
+      x = parseFloat(d3.select(obj).attr("x")) + d3.event.dx
+      y = parseFloat(d3.select(obj).attr("y")) + d3.event.dy
+      d3.select(obj).style "fill", "#855"
+      d3.select(obj).attr("x", x)
+      d3.select(obj).attr("y", y)
+      Entities.update d3.select(obj).attr("_id"),
+        $set:
+          x: x
+          y: y
+      d3.select(obj).attr("cursor", "move")
+
+    dragArrow = (obj)->
+      console.log 'dragArrow'
+
     drawEntity = (rect)->
       vis.append("g").append("rect")
       .attr("name", "box#{rect.v}")
+      .attr("class", "entity")
       .attr("x", rect.x)
       .attr("y", rect.y)
       .attr("width", rect.width)
       .attr("height", rect.height)
-      .attr("stroke", "#000000")
-      .attr("stroke-width", 1)
-      .attr("fill", "#fff")
-      .attr("cursor", "default")
       .attr("_id", rect._id)
-      .call(d3.behavior.drag().on("drag", (d)->
-          x= parseFloat(d3.select(@).attr("x")) + d3.event.dx
-          y= parseFloat(d3.select(@).attr("y")) + d3.event.dy
-          id= d3.select(@).attr("_id")
-          d3.select(@).style "fill", "#855"
-          d3.select(@).attr("x", x)
-          d3.select(@).attr("y", y)
-          Entities.update d3.select(@).attr("_id"),
-            $set:
-              x: x
-              y: y
-#          if d3.select("[data-source=#{@id}]")[0][0]
-#            d3.select("[data-source=#{@id}]").attr("stroke", "#008")
-#            d3.select("[data-source=#{@id}]").attr("x1", parseFloat(d3.select("[data-source=#{@id}]").attr("x1")) + d3.event.dx)
-#            d3.select("[data-source=#{@id}]").attr("y1", parseFloat(d3.select("[data-source=#{@id}]").attr("y1")) + d3.event.dy)
-#          if d3.select("[data-dest=#{@id}]")[0][0]
-#            d3.select("[data-dest=#{@id}]").attr("stroke", "#008")
-#            d3.select("[data-dest=#{@id}]").attr("x2", parseFloat(d3.select("[data-dest=#{@id}]").attr("x2")) + d3.event.dx)
-#            d3.select("[data-dest=#{@id}]").attr("y2", parseFloat(d3.select("[data-dest=#{@id}]").attr("y2")) + d3.event.dy)
-          d3.select(@).attr("cursor", "move")
+      .on("click", ->
+          @
+        )
+      .call(d3.behavior.drag().on("drag",->
+          d3.event.sourceEvent.shiftKey and dragArrow(@) or dragBox(@)
         ).on("dragend", ->
-#          if d3.select("[data-source=#{@id}]")[0][0]
-#            d3.select("[data-source=#{@id}]").attr("stroke", "#800")
-#          d3.select("[data-dest=#{@id}]").attr("stroke", "#800")
-          d3.select(@).style "fill", "#fff"
-          d3.select(@).attr("cursor", "default")
+          d3.select(@).attr "fill", "#fff"
+          d3.select(@).attr "cursor", "default"
+        ).on("dragstart", ->
+          console.log 'start', d3.event.sourceEvent.shiftKey
+          d3.event.sourceEvent.shiftKey and d3.event.sourceEvent.stopPropagation()
         ))
-    boxes = Entities.find().observe
+    Entities.find().observe
       added: (item)->
         drawEntity item
       changed: (item)->
         d3.select("[_id=#{item._id}]").attr("x", item.x).attr("y", item.y)
-
-    boxes = boxes.count and boxes.fetch() or [{}]
-    boxes.reduce (v1, v2)->
-      vis.append("g").append("line")
-      .attr("id", "line#{v2}")
-      .attr("data-source", "box#{v1.v}")
-      .attr("data-dest", "box#{v2.v}")
-      .attr("x1", v1.x + v1.width/2)
-      .attr("y1", v1.y + v1.height/2)
-      .attr("x2", v2.x + v2.width/2)
-      .attr("y2", v2.y + v2.height/2)
-      .attr("stroke", "#800")
-      .attr("stroke-width", 1)
-      .attr("class", "link")
-      v2
+      removed: (item)->
+        d3.select("[_id=#{item._id}]").remove()
